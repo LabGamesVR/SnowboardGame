@@ -1,4 +1,4 @@
-# Nome do Projeto
+# Snowboard Game
 
 Para fins de testes, a movimentação está sendo feita pelo teclado utilizando as teclas A (Anda para esquerda) e D (Anda para direita)
 
