@@ -11,7 +11,7 @@ Ideias para plotar o gráfico:
 x = []
 y = []
   
-with open('teste_2023-04-24-1.csv','r') as csvfile:
+with open('./results//teste1_2023-10-16-1.csv','r') as csvfile:
     plots = csv.reader(csvfile, delimiter = ',')
       
     for row in plots:

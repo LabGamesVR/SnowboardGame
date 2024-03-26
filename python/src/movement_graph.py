@@ -55,7 +55,7 @@ def menu():
 # print(tmp)
 
 # with open(f'{str(files_dict[opc])[5:-1]}','r') as csvfile:
-with open(f'anormal_2023-08-12-5.csv','r') as csvfile:
+with open(f'./results/teste1_2023-10-16-1.csv','r') as csvfile:
 
     plots = csv.reader(csvfile, delimiter = ',')
       

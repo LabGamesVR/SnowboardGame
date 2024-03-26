@@ -14,6 +14,7 @@ from datetime import date
 import serial
 import serial.tools.list_ports
 import glob
+import random
 from timeit import default_timer as timer
 
 class Game:
@@ -73,6 +74,27 @@ class Game:
         self.layered_sprites.add(self.obstacles, layer = 0)
         self.layered_sprites.add(self.clouds, layer = 0)
         self.header = True
+
+        self.newAlpha = 0
+        self.filter = pg.Surface(s.DIMENSIONS)
+        self.filter.set_alpha(self.newAlpha)
+        self.filterColor = s.RED
+        self.filter.fill(self.filterColor)
+        self.speedUpFlag = False
+
+        s.obsArr = []
+        for i in range (s.obsMaxIndex):
+            s.obsArr.append(random.choice([int(s.HALF_SCREEN_WIDTH-1), int(s.HALF_SCREEN_WIDTH+1)]))
+        s.obsIndex = 0
+        s.obsCurrIndex = 0
+        s.obsMaxIndex = 50
+        s.obsToSpeedUp = s.obsCount
+        s.OBSTIME = 3500
+        s.obstaclesElapsed = 0
+        s.obsSpeed = 2
+        s.obsMov = 1.5
+        s.obsScale = 0.01
+        print(s.obsArr)
         self.countdown()
         print("Countdown end!")
         # self.tutorial()
@@ -88,20 +110,29 @@ class Game:
         print("RANDOM MODE") # DEBUG
         self.ADDCLOUD = pg.USEREVENT + 1
         self.ADDOBSTACLE = pg.USEREVENT + 2
+        self.ADDSTARS = pg.USEREVENT + 3
         # Reset obstacle event timer
         pg.time.set_timer(self.ADDOBSTACLE, 0)
+        # Disable Stars event timer
+        pg.time.set_timer(self.ADDSTARS, 0)
         # New clouds will spawn at 1000ms intervals
         pg.time.set_timer(self.ADDCLOUD, 1000)
-        pg.time.set_timer(self.ADDOBSTACLE, 3500)
+        # New objects will spawn at s.OBSTIME intervals
+        pg.time.set_timer(self.ADDOBSTACLE, s.OBSTIME)
+
         self.score = 0
         pg.mixer.music.play(-1)
         self.playing = True
         self.set_var()
+
+        # Reset some configurations
         s.score = 0
         s.obstaclesElapsed = 0
         s.scoreArr = list(map(int, str(s.score)))
         s.startTime = 0
         s.startTime = time.time()
+
+        # Check if using arduinos
         if self.isArduino:
             self.dataToSend = '2'
             self.ser.write(self.dataToSend.encode())
@@ -115,36 +146,35 @@ class Game:
 
         while self.playing:
             self.clock.tick(s.FPS)
+
             if self.isArduino:
                 if self.ser.inWaiting() > 0:
                     self.incomingData = self.ser.readline().decode().strip()
-                    # print(self.incomingData)
+                    print(self.incomingData)
                     if self.checkData in self.incomingData:
                         self.dataToCsv = list(self.incomingData.split(","))
                         # print(f"raw list {self.dataToCsv}")
                         self.x = self.dataToCsv[1]
                         self.y = self.dataToCsv[2]
-                        self.z = self.dataToCsv[3]
+                        self.xAcc = self.dataToCsv[3]
+                        self.yAcc = self.dataToCsv[4]
+
                         self.tmpTime = timer() # marca tempo sempre que chega dado
                         self.currTime = f'{(timer() - self.start):.2f}'
-                        # self.dataToCsv.append(f'{self.currTime:.2f}')
-                        # self.xAcc = self.dataToCsv[4]
-                        # self.yAcc = self.dataToCsv[5]
-                        # self.zAcc = self.dataToCsv[6]
-                        # print(self.x, self.y, self.z, self.xAcc, self.yAcc, self.zAcc)
-                        # self.dataToCsv = [self.x, self.y, self.z, self.xAcc, self.yAcc, self.zAcc]
+                        
                         self.elapsedHitTime = f'{(timer() - self.tmpHitTime):.2f}'
-                        self.dataToCsv = [self.x, self.y, self.z, self.elapsedHitTime ,self.currTime]
+                        self.dataToCsv = [self.x, self.y, self.xAcc, self.yAcc, self.elapsedHitTime ,self.currTime, s.score]
                         print(f"modified list {self.dataToCsv}")
-                    # data = (f"{data[0]}")
+                        
                         if self.x != '-1':
                             if self.header:
-                                with open('results\\movement_graph.csv', 'a+') as file:
-                                    reader = csv.reader(file)
-                                    dataWriter = csv.writer(file, lineterminator='\n')
-                                    self.dataToCsv = ['X', 'Y', 'Z', 'tempo_obstaculo', 'tempo_total']
-                                    dataWriter.writerow(self.dataToCsv)
-                                    self.header = False
+                                self.header = False
+
+                                # with open('results\\movement_graph.csv', 'a+') as file:
+                                #     reader = csv.reader(file)
+                                #     dataWriter = csv.writer(file, lineterminator='\n')
+                                #     self.dataToCsv = ['X', 'Y', 'xAcc', 'yAcc', 'tempo_obstaculo', 'tempo_total', 'pontuacao']
+                                #     dataWriter.writerow(self.dataToCsv)
                             if not self.header:
                                 with open('results\\movement_graph.csv', 'a+') as file:
                                     reader = csv.reader(file)
@@ -158,6 +188,61 @@ class Game:
             # self.arduino.get_data()
             self.events()
             self.update_game_screen()
+        
+        self.save_screen()
+        self.tela_final()
+
+    # Game over screen
+    def tela_final(self):
+        print("GO screen") # DEBUG
+        self.final_loop = True
+        # pg.mixer.init()
+        # pg.mixer.music.load('snd\\musicaMenu.mp3')
+        # pg.mixer.music.play(-1)
+        
+        while self.final_loop:
+            
+            self.screen.blit(s.fundo, (0, 0))
+
+            self.escreve('Pressione Esc para sair', s.fontesc, (255, 255, 255), self.screen, (s.SCREEN_WIDTH/1.19) , (s.SCREEN_HEIGHT/1.03))
+
+            s.go_draw_group.draw(self.screen)
+            
+            if self.hover_check(s.retry_btn1):
+                s.go_retry.draw(self.screen)
+            elif self.hover_check(s.go_exit_btn1):
+                s.go_quit.draw(self.screen)
+            
+            for event in pg.event.get():
+                if event.type == pg.QUIT:
+                    self.quit()
+                if event.type == pg.KEYDOWN:
+                    if event.type == pg.K_ESCAPE:
+                        self.quit()
+                if event.type == pg.MOUSEBUTTONDOWN:
+                    self.mx = pg.mouse.get_pos()[0]
+                    self.my = pg.mouse.get_pos()[1]
+                    print(self.mx, self.my)
+                    
+                    # Retry
+                    if self.mx >= 113 and self.mx <= 113 + 300 and self.my >= 456 and self.my <= 456 + 75:
+                        print("click")
+                        s.click_snd.play()
+                        self.screen.blit(s.retry_btn3, [113, 456])
+                        pg.display.update()
+                        self.final_loop = False
+                        self.new_game()
+                    
+                    # Quit
+                    if self.mx >= 787 and self.mx <= 787 + 300 and self.my >= 456 and self.my <= 456 + 75:
+                        s.click_snd.play()
+                        self.screen.blit(s.go_exit_btn3, [787, 456])
+                        pg.display.update()
+                        # self.quit()
+                        self.final_loop = False
+            
+            pg.display.update()
+        pg.mixer.music.stop()
 
 # Get the RANDOM mode game events
     def events(self):
@@ -174,11 +259,22 @@ class Game:
                 
                 elif event.type == self.ADDOBSTACLE:
                     if (len(self.obstacles) < 2):
+                        print(s.score, s.obsToSpeedUp, s.OBSTIME)
+                        if (s.score) == s.obsToSpeedUp:
+                            if s.OBSTIME > 700+s.obsSpeedUpTime:
+                                self.speedUpFlag = False
+                                s.obsToSpeedUp += s.obsCount
+                                s.obsSpeed += s.obsSpeedUpValue
+                                s.obsMov += s.obsSpeedUpValue
+                                s.obsScale += 0.001
+                                s.OBSTIME -= s.obsSpeedUpTime
+                                print(s.OBSTIME)
                         self.new_obs = obs.Obstacle(mode=2)
                         # self.new_stone2 = stn.Stone()
                         self.obstacles.add(self.new_obs)
                         # self.stones.add(self.new_stone2)
                         self.layered_sprites.add(self.new_obs, layer = 0)
+                        s.helper_sound.play()
                         # self.layered_sprites.add(self.new_stone2, layer = 0)
                 
                 elif event.type == pg.MOUSEBUTTONDOWN:
@@ -232,10 +328,27 @@ class Game:
         s.scoreArr = list(map(int, str(s.score)))
         s.startTime = 0
         s.startTime = time.time()
-        
+        self.start = timer()
+        self.tmpHitTime = timer()
+        s.obsArr = self.sideArr
+        s.obsIndex = 0
+        s.obsCurrIndex = 0
+        s.obsMaxIndex = 4
+        s.OBSTIME = 5000
+        s.obstaclesElapsed = 0
+        s.obsSpeed = 2
+        s.obsMov = 1.5
+        s.obsCount = 1
+        s.obsScale = 0.01
+
+        self.newAlpha = 0
+        self.filter = pg.Surface(s.DIMENSIONS)
+        self.filter.set_alpha(self.newAlpha)
+
         while self.playingTutorial:
             self.clock.tick(s.FPS)
             self.tutorialEvents()
+            # self.tutorial_update_game_screen()
             self.update_game_screen()
         
         # Get the TUTORIAL mode game events
@@ -333,6 +446,98 @@ class Game:
         pg.mixer.music.stop()
 
 
+ # Update the game screen on tutorial
+    def tutorial_update_game_screen(self):
+        self.road_pos+=self.road_acceleration
+        if self.road_pos>=self.texture_position_threshold:
+            self.road_pos=0
+        self.spr.update_sprites_pos()
+                
+        # Draw the road
+        self.texture_position=self.road_pos
+        self.dz=0
+        self.z=0            
+        self.screen.blit(s.bg_img, (0, 0))
+
+
+        for i in range(s.HALF_SCREEN_HEIGHT-1,-1,-1):
+            if self.texture_position<self.half_texture_position_threshold:
+                self.screen.blit(s.light_road,(0,i+s.HALF_SCREEN_HEIGHT),(0,i,s.SCREEN_WIDTH,1))   
+            else:
+                self.screen.blit(s.dark_road,(0,i+s.HALF_SCREEN_HEIGHT),(0,i,s.SCREEN_WIDTH,1))
+            self.spr.scale_sprites(i)
+            
+            self.dz+=self.ddz
+            self.z+=self.dz
+            self.texture_position+=self.texture_position_acceleration+self.z
+            if self.texture_position>=self.texture_position_threshold:
+                self.texture_position=0
+        
+        self.spr.blit_sprites(self.screen)
+        
+
+        self.clouds.update()
+        self.obstacles.update()
+        self.player.update()
+        
+        # self.screen.blit(obstacle.helpSurf, ((s.SCREEN_WIDTH/2) - (s.helperW/2), s.SCREEN_HEIGHT*0.2))
+
+        
+        # Draw all entities from layered sprite group
+        for entity in self.layered_sprites:
+            self.screen.blit(entity.surf, entity.rect)     
+        
+        self.hud()
+       
+    
+
+        # Draw player's hitbox
+        # pg.draw.rect(self.screen, s.RED, self.player.hitbox, 1)
+        
+        
+        # Check for collisions between player and obstacle
+        for obstacle in self.obstacles:
+            # pg.draw.rect(self.screen, s.BLUE, obstacle.rect, 1)
+            
+            # Draw helping arrow on screen
+            if obstacle.y > (s.SCREEN_HEIGHT*0.5) and obstacle.y < (s.SCREEN_HEIGHT*0.7):
+                self.screen.blit(obstacle.helpSurf, ((s.SCREEN_WIDTH/2) - (s.helperW/2), s.SCREEN_HEIGHT*0.2))
+            if self.player.hitbox.colliderect(obstacle.rect):
+                if self.player.life_count == 3: # se ainda nao levou dano
+                    self.elapsedHitTime = f'{(timer() - self.start):.2f}'
+                    if not self.isArduino:
+                        with open('results\\movement_graph.csv', 'a+') as file:
+                            reader = csv.reader(file)
+                            dataWriter = csv.writer(file, lineterminator='\n')
+                            self.dataToCsv = ["pontuacao", "tempo_obstaculo", "tempo_total"]
+                            dataWriter.writerow(self.dataToCsv)
+                else:
+                    self.elapsedHitTime = f'{(timer() - self.tmpHitTime):.2f}'
+                self.tmpHitTime = timer() # marca tempo que levou dano
+                self.player.take_damage()
+                s.bonk_snd.play()
+                # print("HIT")
+                s.obstacleDir = None
+                obstacle.kill()
+                
+                if not self.isArduino:
+                    self.currTime = f'{(timer() - self.start):.2f}'
+                    with open('results\\movement_graph.csv', 'a+') as file:
+                        reader = csv.reader(file)
+                        dataWriter = csv.writer(file, lineterminator='\n')
+                        self.dataToCsv = [s.score,self.elapsedHitTime,self.currTime]
+                        dataWriter.writerow(self.dataToCsv)
+            # else:
+            #     self.score += 1
+            #     self.text = s.font.render(f"Pontuação: {str(self.score)}", True, s.BLACK)
+        # self.text = s.font.render(f"Pontuação: {str(s.score)}", True, s.BLACK) 
+        # self.score = list(str(s.score))
+        # print(f"Lista = {s.scoreArr}")
+        # self.screen.blit(self.text, self.textRect)
+        self.show_score()
+        pg.display.flip()
+    
+
 
 # Run game in controlled mode
     '''
@@ -375,6 +580,27 @@ class Game:
         self.start = timer()
         self.tmpHitTime = timer()
 
+        self.newAlpha = 0
+        self.filter = pg.Surface(s.DIMENSIONS)
+        self.filter.set_alpha(self.newAlpha)
+        self.filterColor = s.RED
+        self.filter.fill(self.filterColor)
+        self.speedUpFlag = False
+
+        s.obsArr = []
+        # for i in range (s.obsMaxIndex):
+        #     s.obsArr.append(random.choice([int(s.HALF_SCREEN_WIDTH-1), int(s.HALF_SCREEN_WIDTH+1)]))
+        s.obsIndex = 0
+        s.obsCurrIndex = 0
+        s.obsMaxIndex = 50
+        s.obsToSpeedUp = s.obsCount
+        s.OBSTIME = 3500
+        s.obstaclesElapsed = 0
+        s.obsSpeed = 2
+        s.obsMov = 1.5
+        s.obsScale = 0.01
+        # print(s.obsArr)
+
         while self.playingControlled:
             self.clock.tick(s.FPS)
             if (len(self.obstacles) == 0) and (len(self.ControlledSideArr) == 0):
@@ -390,30 +616,29 @@ class Game:
                     # print(self.incomingData)
                     if self.checkData in self.incomingData:
                         self.dataToCsv = list(self.incomingData.split(","))
-                        # print(f"raw list {self.dataToCsv}")
+                        print(f"raw list {self.dataToCsv} | len {len(self.dataToCsv)}")
+                        
                         self.x = self.dataToCsv[1]
                         self.y = self.dataToCsv[2]
-                        self.z = self.dataToCsv[3]
+                        self.xAcc = self.dataToCsv[3]
+                        self.yAcc = self.dataToCsv[4]
+
                         self.tmpTime = timer() # marca tempo sempre que chega dado
                         self.currTime = f'{(timer() - self.start):.2f}'
-                        # self.dataToCsv.append(f'{self.currTime:.2f}')
-                        # self.xAcc = self.dataToCsv[4]
-                        # self.yAcc = self.dataToCsv[5]
-                        # self.zAcc = self.dataToCsv[6]
-                        # print(self.x, self.y, self.z, self.xAcc, self.yAcc, self.zAcc)
-                        # self.dataToCsv = [self.x, self.y, self.z, self.xAcc, self.yAcc, self.zAcc]
+                        
                         self.elapsedHitTime = f'{(timer() - self.tmpHitTime):.2f}'
-                        self.dataToCsv = [self.x, self.y, self.z, self.elapsedHitTime ,self.currTime]
+                        self.dataToCsv = [self.x, self.y, self.xAcc, self.yAcc, self.elapsedHitTime ,self.currTime, s.score]
                         print(f"modified list {self.dataToCsv}")
-                    # data = (f"{data[0]}")
+
+  
                         if self.x != '-1':
                             if self.header:
-                                with open('results\\movement_graph.csv', 'a+') as file:
-                                    reader = csv.reader(file)
-                                    dataWriter = csv.writer(file, lineterminator='\n')
-                                    self.dataToCsv = ['X', 'Y', 'Z', 'tempo_obstaculo', 'tempo_total']
-                                    dataWriter.writerow(self.dataToCsv)
-                                    self.header = False
+                                self.header = False
+                                # with open('results\\movement_graph.csv', 'a+') as file:
+                                #     reader = csv.reader(file)
+                                #     dataWriter = csv.writer(file, lineterminator='\n')
+                                #     self.dataToCsv = ['X', 'Y', 'xAcc', 'yAcc', 'tempo_obstaculo', 'tempo_total', 'pontuacao']
+                                #     dataWriter.writerow(self.dataToCsv)
                             if not self.header:
                                 with open('results\\movement_graph.csv', 'a+') as file:
                                     reader = csv.reader(file)
@@ -443,10 +668,12 @@ class Game:
             if event.type == pg.KEYDOWN:
                 if event.key == pg.K_RIGHT:
                     self.ControlledSideArr.append(s.obs_right)
+                    s.obsArr.append(s.obs_right)
                     print(self.ControlledSideArr)
                 
                 if event.key == pg.K_LEFT:
                     self.ControlledSideArr.append(s.obs_left)
+                    s.obsArr.append(s.obs_left)
                     print(self.ControlledSideArr)
 
             # Add a new cloud if the existing number of clouds is lesser than 10
@@ -462,19 +689,27 @@ class Game:
                     if len(self.ControlledSideArr) == 0:
                         pass
                     else:
+                        if (s.score) == s.obsToSpeedUp:
+                            if s.OBSTIME > 500+s.obsSpeedUpTime:
+                                self.speedUpFlag = False
+                                s.obsToSpeedUp += s.obsCount
+                                s.obsSpeed += s.obsSpeedUpValue
+                                s.obsMov += s.obsSpeedUpValue
+                                s.obsScale += 0.001
+                                s.OBSTIME -= s.obsSpeedUpTime
                         self.new_obs = obs.Obstacle(mode=1, side=self.ControlledSideArr.pop(0))
                         # self.new_stone2 = stn.Stone()
                         self.obstacles.add(self.new_obs)
                         # self.stones.add(self.new_stone2)
                         self.layered_sprites.add(self.new_obs, layer = 0)
                         print(self.ControlledSideArr)
-                        print(f"objetos = {len(self.obstacles)} | array = {len(self.ControlledSideArr)}")
+                        # print(f"objetos = {len(self.obstacles)} | array = {len(self.ControlledSideArr)}")
                         if (len(self.obstacles) == 0) and (len(self.ControlledSideArr) == 0):
                             pg.time.set_timer(self.ADDOBSTACLE, 100)
                             print("TIMER = 100")
                         if len(self.ControlledSideArr) >= 1:
-                            pg.time.set_timer(self.ADDOBSTACLE, 5000)
-                            print("TIMER = 5000")
+                            pg.time.set_timer(self.ADDOBSTACLE, s.OBSTIME)
+                            print(f"TIMER = {s.OBSTIME}")
                         # self.layered_sprites.add(self.new_stone2, layer = 0)
 
             
@@ -483,7 +718,7 @@ class Game:
                 self.my = pg.mouse.get_pos()[1]
                 print(self.mx, self.my)
 
-            if self.player.life_count == 0:
+            if self.player.life_count == 2:
                 self.player.kill()
                 pg.time.set_timer(self.ADDOBSTACLE, 0)
                 if self.isArduino:
@@ -525,7 +760,7 @@ class Game:
                     
                     # Retry
                     if self.mx >= 113 and self.mx <= 113 + 300 and self.my >= 456 and self.my <= 456 + 75:
-                        print("click")
+                        # print("click")
                         s.click_snd.play()
                         self.screen.blit(s.retry_btn3, [113, 456])
                         pg.display.update()
@@ -563,7 +798,56 @@ class Game:
         self.texture_position_threshold = s.texture_position_threshold
         self.half_texture_position_threshold = s.half_texture_position_threshold
     
+
+    def obsHelper(self):
+        self.helpX = s.HALF_SCREEN_WIDTH
+        self.helpY = s.HALF_SCREEN_HEIGHT
+        # print(f"array: {len(s.obsArr)} | index: {s.obsIndex} | curr: {s.obsCurrIndex}")
+        if len(s.obsArr) > s.obsIndex:
+            if s.obsCurrIndex == s.obsIndex:
+                self.obsStart = timer()
+                s.obsCurrIndex += 1
+                pg.time.set_timer(self.ADDOBSTACLE, s.OBSTIME)
+                # print(f"index: {s.obsIndex}")
+                
+
+
+            # print(s.obsIndex)
+            # print(f"side {s.obsArr[s.obsIndex]}")
+            if s.obsArr[s.obsIndex] < s.HALF_SCREEN_WIDTH:
+                self.helpSurf = s.right_arrow
+            else:
+                self.helpSurf = s.left_arrow
+
+            self.helpRect = self.helpSurf.get_rect(
+                center = (
+                    self.helpX,
+                    self.helpY
+                )
+            )
+            
+            self.obsCurrTime = float(timer() - self.obsStart)
+            # print(self.obsCurrTime)
+            if self.obsCurrTime > 1 and self.obsCurrTime < s.OBSTIME-250:
+                # if self.obsCurrTime >= 1 and self.obsCurrTime <= 1.01:
+                #     s.helper_sound.play()
+
+                # print(f"tempo: {self.obsCurrTime}")
+                self.screen.blit(self.helpSurf, ((s.SCREEN_WIDTH/2) - (s.helperW/2), s.SCREEN_HEIGHT*0.2))
     
+    def speed_up_effect(self):
+        # self.filter = pg.Surface(s.DIMENSIONS)
+        # self.newAlpha = (32+(s.obsSpeed*10))
+        if int(self.newAlpha) == 135 and self.filterColor == s.RED:
+            self.filterColor = s.BLUE
+            self.filter.fill(self.filterColor)
+            self.newAlpha = 80
+        #     print("new color")
+        # print(f"newAlpha = {self.newAlpha} + 20")
+        self.newAlpha += 45
+        self.filter.set_alpha(self.newAlpha)
+        # self.filter.fill((255,0,0))
+
     # Update the game screen
     def update_game_screen(self):
         self.road_pos+=self.road_acceleration
@@ -577,6 +861,17 @@ class Game:
         self.z=0            
         self.screen.blit(s.bg_img, (0, 0))
 
+        if (s.score) == s.obsToSpeedUp and not self.speedUpFlag:
+            self.speedUpFlag = True
+            self.speed_up_effect()
+            # print(f"alpha: {self.newAlpha}, modifier = 32 + {s.obsSpeed*10}")
+        self.screen.blit(self.filter, (0,0))
+        
+        
+        # self.filter = pg.Surface(s.DIMENSIONS)
+        # self.filter.set_alpha(32)
+        # self.filter.fill((255,0,0))
+        # self.screen.blit(self.filter, (0,0))
 
         for i in range(s.HALF_SCREEN_HEIGHT-1,-1,-1):
             if self.texture_position<self.half_texture_position_threshold:
@@ -591,19 +886,31 @@ class Game:
             if self.texture_position>=self.texture_position_threshold:
                 self.texture_position=0
         
+        
+
         self.spr.blit_sprites(self.screen)
         
+
         self.clouds.update()
         self.obstacles.update()
         self.player.update()
+        
+        # self.screen.blit(obstacle.helpSurf, ((s.SCREEN_WIDTH/2) - (s.helperW/2), s.SCREEN_HEIGHT*0.2))
+
         
         
         # Draw all entities from layered sprite group
         for entity in self.layered_sprites:
             self.screen.blit(entity.surf, entity.rect)
         
-        self.hud()
         
+        
+        self.obsHelper()        
+        
+        self.hud()
+       
+    
+
         # Draw player's hitbox
         # pg.draw.rect(self.screen, s.RED, self.player.hitbox, 1)
         
@@ -613,8 +920,8 @@ class Game:
             # pg.draw.rect(self.screen, s.BLUE, obstacle.rect, 1)
             
             # Draw helping arrow on screen
-            if obstacle.y > (s.SCREEN_HEIGHT*0.5) and obstacle.y < (s.SCREEN_HEIGHT*0.7):
-                self.screen.blit(obstacle.helpSurf, ((s.SCREEN_WIDTH/2) - (s.helperW/2), s.SCREEN_HEIGHT*0.2))
+            # if obstacle.y > (s.SCREEN_HEIGHT*0.5) and obstacle.y < (s.SCREEN_HEIGHT*0.7):
+            #     self.screen.blit(self.helpSurf, ((s.SCREEN_WIDTH/2) - (s.helperW/2), s.SCREEN_HEIGHT*0.2))
             if self.player.hitbox.colliderect(obstacle.rect):
                 if self.player.life_count == 3: # se ainda nao levou dano
                     self.elapsedHitTime = f'{(timer() - self.start):.2f}'
@@ -704,6 +1011,8 @@ class Game:
     # Main menu screen
     def main_menu(self):
         print("MAIN_MENU") # DEBUG
+        self.menu_loop = True
+
         if self.menu_loop:
             self.menu_loop = True
             pg.mixer.init()
@@ -720,6 +1029,8 @@ class Game:
                 
                 if self.hover_check(s.start_btn1):
                     s.mm_start.draw(self.screen)
+                elif self.hover_check(s.tutorial_btn2):
+                    s.mm_tutorial.draw(self.screen)
                 elif self.hover_check(s.training_btn1):
                     s.mm_training.draw(self.screen)
                 elif self.hover_check(s.exit_btn1):
@@ -737,13 +1048,22 @@ class Game:
                         print(self.mx, self.my)
                         
                         # Start
-                        if self.mx >= 60 and self.mx <= 60 + 300 and self.my >= 200 and self.my <= 200 + 75:
+                        if self.mx >= 60 and self.mx <= 60 + 300 and self.my >= 115 and self.my <= 115 + 75:
                             print("click")
                             s.click_snd.play()
                             self.screen.blit(s.start_btn3, [60, 200])
                             pg.display.update()
                             self.menu_loop = False
                             self.new_game()
+                        
+                        # Tutorial
+                        if self.mx >= 60 and self.mx <= 60 + 300 and self.my >= 200 and self.my <= 200 + 75:
+                            print("click")
+                            s.click_snd.play()
+                            self.screen.blit(s.tutorial_btn3, [60, 200])
+                            pg.display.update()
+                            self.menu_loop = False
+                            self.tutorial()
 
                         # Training
                         if self.mx >= 60 and self.mx <= 60 + 300 and self.my >= 285 and self.my <= 285 + 75:
@@ -866,7 +1186,7 @@ class Game:
         self.now = datetime.now()
         self.now.strftime("%d/%m/%Y %H:%M:%S")
         self.today = date.today()
-        self.dir_path = f'.\\{self.userTxt.lower()}*.csv'
+        self.dir_path = f'results\\{self.userTxt.lower()}_*.csv'
         self.files_found = glob.glob(self.dir_path)
         print(self.files_found)
         os.rename('results\\movement_graph.csv', f'results\\{self.userTxt.lower()}_{self.today}-{len(self.files_found)+1}.csv')
@@ -875,54 +1195,4 @@ class Game:
             self.scoreWriter = csv.writer(file, lineterminator='\n')
             self.scoreWriter.writerow(self.results)
         self.score_loop = False
-
-    # Game over screen
-    def tela_final(self):
-        print("GO screen") # DEBUG
-        self.final_loop = True
-        # pg.mixer.init()
-        # pg.mixer.music.load('snd\\musicaMenu.mp3')
-        # pg.mixer.music.play(-1)
-        
-        while self.final_loop:
-            
-            self.screen.blit(s.fundo, (0, 0))
-
-            self.escreve('Pressione Esc para sair', s.fontesc, (255, 255, 255), self.screen, (s.SCREEN_WIDTH/1.19) , (s.SCREEN_HEIGHT/1.03))
-
-            s.go_draw_group.draw(self.screen)
-            
-            if self.hover_check(s.retry_btn1):
-                s.go_retry.draw(self.screen)
-            elif self.hover_check(s.go_exit_btn1):
-                s.go_quit.draw(self.screen)
-            
-            for event in pg.event.get():
-                if event.type == pg.QUIT:
-                    self.quit()
-                if event.type == pg.KEYDOWN:
-                    if event.type == pg.K_ESCAPE:
-                        self.quit()
-                if event.type == pg.MOUSEBUTTONDOWN:
-                    self.mx = pg.mouse.get_pos()[0]
-                    self.my = pg.mouse.get_pos()[1]
-                    print(self.mx, self.my)
-                    
-                    # Retry
-                    if self.mx >= 113 and self.mx <= 113 + 300 and self.my >= 456 and self.my <= 456 + 75:
-                        print("click")
-                        s.click_snd.play()
-                        self.screen.blit(s.retry_btn3, [113, 456])
-                        pg.display.update()
-                        self.final_loop = False
-                        self.new_game()
-                    
-                    # Quit
-                    if self.mx >= 787 and self.mx <= 787 + 300 and self.my >= 456 and self.my <= 456 + 75:
-                        s.click_snd.play()
-                        self.screen.blit(s.go_exit_btn3, [787, 456])
-                        pg.display.update()
-                        self.quit()
-            
-            pg.display.update()
-        pg.mixer.music.stop()
+        # self.tela_final()

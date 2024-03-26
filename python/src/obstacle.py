@@ -12,16 +12,38 @@ class Obstacle(pg.sprite.Sprite):
     def __init__(self, mode=1, side=s.obs_left):
         super(Obstacle, self).__init__()
         self.score = 0
-        self.speed = 2
-        self.mov = 1.5
+        self.speed = s.obsSpeed
+        self.mov = s.obsMov
         self.i = 0
         s.obstaclesElapsed += 1
+
+        print(f"score {s.score} | obsToSpeedUp {s.obsToSpeedUp}")
+
+        # if (s.score) == s.obsToSpeedUp and s.obstaclesElapsed >= s.obsToSpeedUp:
+        #     s.obsToSpeedUp += s.obsCount
+        #     s.obsSpeed += s.obsSpeedUpValue
+        #     s.obsMov += s.obsSpeedUpValue
+        #     s.obsScale += 0.001
+        #     s.OBSTIME -= s.obsSpeedUpTime
+
+
+
+
+        print(f"Obstacle speed: {self.speed}")
+
         # Randomize obstacle direction (left, middle, right)
         # self.x = random.choice([int(s.HALF_SCREEN_WIDTH-10), s.HALF_SCREEN_WIDTH, int(s.HALF_SCREEN_WIDTH+1)])
         if mode == 1:
             self.x = side
+            s.obsIndex += 1
+            if s.obsIndex >= s.obsMaxIndex:
+                s.obsIndex = 0
+
         elif mode == 2:
-            self.x = random.choice([int(s.HALF_SCREEN_WIDTH-1), int(s.HALF_SCREEN_WIDTH+1)])
+            self.x = s.obsArr[s.obsIndex]
+            s.obsIndex += 1
+            if s.obsIndex >= s.obsMaxIndex:
+                s.obsIndex = 0
         
         
         self.y = s.HALF_SCREEN_HEIGHT
@@ -57,7 +79,8 @@ class Obstacle(pg.sprite.Sprite):
                 self.y
             )
         )
-        self.helper()
+        if mode == 1:
+            self.helper()
     
     def scale_sprite(self):
         if self.obj == "trunk":
@@ -88,7 +111,8 @@ class Obstacle(pg.sprite.Sprite):
         # print(f"(width, height): {self.surf}")
         
         if self.scaling_num < 2.5:
-            self.scaling_num += 0.01      
+            self.scaling_num += s.obsScale     
+         
 
     def helper(self):
         self.helpX = s.HALF_SCREEN_WIDTH

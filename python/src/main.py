@@ -6,5 +6,5 @@ game = g.Game()
 while True:
     game.main_menu()
     # game.new_game()
-    game.save_screen()
-    game.tela_final()
+    # game.save_screen()
+    # game.tela_final()

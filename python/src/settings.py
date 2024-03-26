@@ -1,5 +1,6 @@
 import pygame as pg
 import math
+import random
 import time
 
 def make_rect(group, path, l, t, w, h,scale=False, nW=0, nH=0):
@@ -31,6 +32,7 @@ HALF_SCREEN_HEIGHT = int(SCREEN_HEIGHT/2)
 HALF_SCREEN_WIDTH = int(SCREEN_WIDTH/2)
 VELOCITY = 7
 MAX_CLOUDS = 10
+MAX_STARS = MAX_CLOUDS // 2
 screen = pg.display.set_mode(DIMENSIONS)
 
 # Sound
@@ -76,6 +78,7 @@ errorCounter = 0 # store the number of error of the player || the variable is in
 mm_draw_group = pg.sprite.Group()
 mm_start = pg.sprite.Group()
 mm_training = pg.sprite.Group()
+mm_tutorial = pg.sprite.Group()
 mm_quit = pg.sprite.Group()
 
 ## Game Over
@@ -102,10 +105,15 @@ saveY = (SCREEN_HEIGHT) - (SCREEN_HEIGHT*0.1 + buttonH)
 # * Menu *
 
 # mm_draw_group
-start_btn1 = make_rect(mm_draw_group, "img\\start1.png", 60, 200, buttonW, buttonH, True, buttonW, buttonH)
-start_btn2 = make_rect(mm_start, "img\\start2.png", 60, 200, buttonW, buttonH, True, buttonW, buttonH)
+start_btn1 = make_rect(mm_draw_group, "img\\start1.png", 60, 115, buttonW, buttonH, True, buttonW, buttonH)
+start_btn2 = make_rect(mm_start, "img\\start2.png", 60, 115, buttonW, buttonH, True, buttonW, buttonH)
 start_btn3 = pg.image.load("img\\start3.png")
 start_btn3 = pg.transform.scale(start_btn3, [300, 75])
+
+tutorial_btn1 = make_rect(mm_draw_group, "img\\tutorial1.png", 60, 200, buttonW, buttonH, True, buttonW, buttonH)
+tutorial_btn2 = make_rect(mm_tutorial, "img\\tutorial2.png", 60, 200, buttonW, buttonH, True, buttonW, buttonH)
+tutorial_btn3 = pg.image.load("img\\tutorial3.png")
+tutorial_btn3 = pg.transform.scale(tutorial_btn3, [300, 75])
 
 training_btn1 = make_rect(mm_draw_group, "img\\treino1.png", 60, 285, buttonW, buttonH, True, buttonW, buttonH)
 training_btn2 = make_rect(mm_training, "img\\treino2.png", 60, 285, buttonW, buttonH, True, buttonW, buttonH)
@@ -183,9 +191,10 @@ bg_img = pg.image.load('img\\sky.png').convert()
 snowman = pg.image.load('img\\boneco_de_neve.png')
 snow_tree = pg.image.load('img\\snow_tree.png')
 trunk = pg.image.load('img\\trunk.png')
-right_arrow = pg.image.load('img\\arrow.png')
+
 helperW = 150
 helperH = 150
+right_arrow = pg.image.load('img\\arrow.png')
 right_arrow = pg.transform.scale(right_arrow, (helperW, helperH))
 left_arrow = pg.image.load('img\\arrow.png')
 left_arrow = pg.transform.flip(left_arrow, True, False)
@@ -212,11 +221,25 @@ clouds = [pg.image.load('img\\cloud1.png'), pg.image.load('img\\cloud2.png'), pg
 for i in range(4):
     clouds[i] = pg.transform.scale(clouds[i], (int(P_X/2), int(P_Y/2)))
 
+# Star images
+
 # Obstacle direction    
 obstacleDir = None
 obstaclesElapsed = 0
+obsCount = 5 # number of points needed to increase speed
+obsSpeed = 2
+obsMov = 1.5
+obsScale = 0.01
+obsToSpeedUp = obsCount
+obsSpeedUpValue = 0.3 # Value that will be increased speed
+obsSpeedUpTime = 200 # Time interval that will be decreased
 obs_left = int(HALF_SCREEN_WIDTH-1)
 obs_right = int(HALF_SCREEN_WIDTH+1)
+obsArr = []
+obsIndex = 0
+obsCurrIndex = 0
+obsMaxIndex = 50
+OBSTIME = 3500
 
 
 
